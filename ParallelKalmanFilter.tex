@@ -1,0 +1,94 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{IEEEtrantools}
+
+
+%opening
+\title{Parallel Batch Kalman Filtering}
+\author{Pete Bunch}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+Sometimes we want to run a Kalman filter offline, for example when using Rao-Blackwellisation in an MCMC algorithm, such as the MCMC-DA system for target tracking. In this case, the sequential nature of the Kalman filter prevents it from being easily parallelisable. Here we try to fix that.
+
+\section{System Equations}
+
+Consider a standard discrete-time linear-Gaussian state-space model,
+%
+\begin{IEEEeqnarray}{rCl}
+ x_n & = & A x_{n-1} + w_n \\
+ y_n & = & C x_n + v_n
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ w_n & \sim & \mathcal{N}(.|0, Q) \\
+ v_n & \sim & \mathcal{N}(.|0, R)     .
+\end{IEEEeqnarray}
+
+For now, we assume that the starting state, $x_0$ is fixed and known. We'll want to relax this condition later.
+
+We can stack up all $N$ of the state and observation equations into matrix equations,
+%
+\begin{IEEEeqnarray}{rCl}
+ \underbrace{\begin{bmatrix}x_1 \\ x_2 \\ x_3 \\ \vdots \\ x_N \end{bmatrix}}_{X} & = & \underbrace{\begin{bmatrix}A \\ A^2 \\ A^3 \\ \vdots \\ A^N \end{bmatrix}}_{F} x_0 + \underbrace{\begin{bmatrix} I & 0 & 0 & \hdots & 0 \\ A & I & 0 & \hdots & 0 \\ A^2 & A & I & \hdots & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots \\ A^N & A^{N-1} & A^{N-2} & \hdots & I \end{bmatrix}}_{G} \underbrace{\begin{bmatrix} w_1 \\ w_2 \\ w_3 \\ \vdots \\ w_N \end{bmatrix}}_{W}
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ \underbrace{\begin{bmatrix}y_1 \\ \vdots \\ y_N \end{bmatrix}}_{Y} & = & \underbrace{\begin{bmatrix}C & & \\ & \ddots & \\ & & C \end{bmatrix}}_{H} \underbrace{\begin{bmatrix}x_1 \\ \vdots \\ x_N \end{bmatrix}}_{X} + \underbrace{\begin{bmatrix} v_1 \\ \vdots \\ v_N \end{bmatrix}}_{V}     .
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ W & \sim & \mathcal{N}\left(.|0, \underbrace{\begin{bmatrix}Q & & \\ & \ddots & \\ & & Q \end{bmatrix}}_{S} \right) \\
+ C & \sim & \mathcal{N}\left(.|0, \underbrace{\begin{bmatrix}R & & \\ & \ddots & \\ & & R \end{bmatrix}}_{T} \right)     .
+\end{IEEEeqnarray}
+
+This gives us the following distributions,
+%
+\begin{IEEEeqnarray}{rCl}
+ X & \sim & \mathcal{N}(.|F x_0,GSG^T) \\
+ Y & \sim & \mathcal{N}(.|H X,T)     .
+\end{IEEEeqnarray}
+
+Now its time for Bayes,
+%
+\begin{IEEEeqnarray}{rCl}
+ P(X|Y) & = & \frac{P(Y|X)P(X)}{P(Y)} \\
+        & = & \mathcal{N}(X|\mu,\Sigma)     .
+\end{IEEEeqnarray}
+
+For completeness, here's the derivation of $\mu$ and $\Sigma$ in full. Its pretty standard completing the square, throughout which we though away constant terms knowing that they'll come out in the wash when we normalise.
+%
+\begin{IEEEeqnarray*}{rCl}
+ P(X|Y) & \propto & P(Y|X) P(X) \\
+        & = & \mathcal{N}(X|F x_0,GSG^T) \mathcal{N}(Y|H X,T) \\
+        & \propto & \exp\left\{ -\frac{1}{2} \left[ (X-F x_0)^T (GSG^T)^{-1} (X-F x_0) + (Y-H X)^T T^{-1} (Y-H X) \right] \right\} \\
+        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T (GSG^T)^{-1} X - 2x_0^T F^T (GSG^T)^{-1} X + X^T H^T T^{-1} H X - 2 Y^T T^{-1} H X \right] \right\} \\
+        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T \left( (GSG^T)^{-1} + H^T T^{-1} H \right) X - 2 \left( x_0^T F^T (GSG^T)^{-1} + Y^T T^{-1} H \right) X \right] \right\} \\
+        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T \Sigma^{-1} X - 2 \mu^T \Sigma^{-1} X \right] \right\}     .
+\end{IEEEeqnarray*}
+
+Comparing terms gives us,
+\begin{IEEEeqnarray}{rCl}
+ \Sigma & = & \left[ (GSG^T)^{-1} + H^T T^{-1} H \right]^{-1} \\
+ \mu    & = & \Sigma \left[ (GSG^T)^{-1} F x_0 + H^T T^{-1} Y \right]     .
+\end{IEEEeqnarray}
+
+Good. $\mu$ is the vector of posterior means for each state. $\Sigma$ is the complete covariance matrix for all states over time. To replicate a Kalman smoother, we only need the blocks on the diagonal of this matrix. The other blocks are the covariances between states at different times, and are less interesting.
+
+$\Sigma$ is highly structured, and in fact we can right is out explicitly. $G$ is square and clearly full rank (because $A$ has to be full rank for a valid HMM), and it turns out that its inverse has the following wizard form,
+%
+\begin{IEEEeqnarray}{rCl}
+ G^{-1} & = & \begin{bmatrix} I & 0 & 0 & \hdots & 0 & 0 \\ -A & I & 0 & \hdots & 0 & 0 \\ 0 & -A & I & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & I & 0 \\ 0 & 0 & 0 & \hdots & -A & I \end{bmatrix}
+\end{IEEEeqnarray}
+
+
+The tasks that remain then are as follows:
+\begin{itemize}
+  \item Calculate the diagonal blocks of $\Sigma$.
+  \item Evaluate the vector $\xi = \left[ (GSG^T)^{-1} F x_0 + H^T T^{-1} Y \right]$.
+  \item Solve the system of equations $\Sigma^{-1} \mu = \xi$ to give us $\mu$.
+\end{itemize}
+
+
+\end{document}
