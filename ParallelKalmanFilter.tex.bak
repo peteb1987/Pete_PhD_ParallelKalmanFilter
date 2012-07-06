@@ -1,0 +1,40 @@
+\documentclass{article}
+
+\usepackage{amsmath}
+\usepackage{IEEEtrantools}
+
+
+%opening
+\title{Parallel Batch Kalman Filtering}
+\author{Pete Bunch}
+
+\begin{document}
+\maketitle
+
+\section{Introduction}
+
+Sometimes we want to run a Kalman filter offline, for example when using Rao-Blackwellisation in an MCMC algorithm, such as the MCMC-DA system for target tracking. In this case, the sequential nature of the Kalman filter prevents it from being easily parallelisable. Here we try to fix that.
+
+\section{System Equations}
+
+Consider a standard discrete-time linear-Gaussian state-space model,
+%
+\begin{IEEEeqnarray}{rCl}
+ x_n & = & A x_{n-1} + w_n \\
+ y_n & = & C x_n + v_n
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ w_n & \sim & \mathcal{N}(.|0, Q) \\
+ v_n & \sim & \mathcal{N}(.|0, R)
+\end{IEEEeqnarray}
+
+For now, we assume that the starting state, $x_0$ is fixed and known. We'll want to relax this condition later.
+
+We can stack up all $N$ of the state and observation equations into matrix equations,
+%
+\begin{IEEEeqnarray}{rCl}
+ \begin{bmatrix}x_1 \\ x_2 \\ \vdots \\ x_N \end{bmatrix} & = & \begin{bmatrix}A \\ A^2 \\ \vdots \\ A^N \end{bmatrix} x_0 + \begin{bmatrix} I & 0 & 0 & \hdots & 0 \\ A & I & 0 & \hdots & 0 \\ A^2 & A & I & \hdots & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots \\ A^N & A^{N-1} & A^{N-2} & \hdots & I \end{bmatrix} \begin{bmatrix} w_1 \\ w_2 \\ w_3 \\ \vdots \\ w_N \end{bmatrix}
+\end{IEEEeqnarray}
+
+
+\end{document}

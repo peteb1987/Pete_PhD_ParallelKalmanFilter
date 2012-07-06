@@ -76,12 +76,19 @@ Comparing terms gives us,
 
 Good. $\mu$ is the vector of posterior means for each state. $\Sigma$ is the complete covariance matrix for all states over time. To replicate a Kalman smoother, we only need the blocks on the diagonal of this matrix. The other blocks are the covariances between states at different times, and are less interesting.
 
-$\Sigma$ is highly structured, and in fact we can right is out explicitly. $G$ is square and clearly full rank (because $A$ has to be full rank for a valid HMM), and it turns out that its inverse has the following wizard form,
+$\Sigma^{-1}$ is highly structured, and in fact we can right is out explicitly. $G$ is square and clearly full rank (because $A$ has to be full rank for a valid HMM), and it turns out that its inverse has the following wizard form,
 %
 \begin{IEEEeqnarray}{rCl}
- G^{-1} & = & \begin{bmatrix} I & 0 & 0 & \hdots & 0 & 0 \\ -A & I & 0 & \hdots & 0 & 0 \\ 0 & -A & I & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & I & 0 \\ 0 & 0 & 0 & \hdots & -A & I \end{bmatrix}
+ G^{-1} & = & \begin{bmatrix} I & 0 & 0 & \hdots & 0 & 0 \\ -A & I & 0 & \hdots & 0 & 0 \\ 0 & -A & I & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & I & 0 \\ 0 & 0 & 0 & \hdots & -A & I \end{bmatrix}     .
 \end{IEEEeqnarray}
 
+Thus we can write,
+%
+{\tiny
+\begin{IEEEeqnarray}{rCl}
+ \Sigma^{-1} & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A + C^T R^{-1} C & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\ -Q^{-1}A & Q^{-1} + A^T Q^{-1} A + C^T R^{-1} C & -A^T Q^{-1} & \hdots & 0 & 0 \\ 0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A + C^T R^{-1} C & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A + C^T R^{-1} C & -A^T Q^{-1} \\ 0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} + C^T R^{-1} C \end{bmatrix}
+\end{IEEEeqnarray}
+}
 
 The tasks that remain then are as follows:
 \begin{itemize}
