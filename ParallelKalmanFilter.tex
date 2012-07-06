@@ -84,11 +84,12 @@ $\Sigma^{-1}$ is highly structured, and in fact we can right is out explicitly. 
 
 Thus we can write,
 %
-{\tiny
 \begin{IEEEeqnarray}{rCl}
- \Sigma^{-1} & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A + C^T R^{-1} C & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\ -Q^{-1}A & Q^{-1} + A^T Q^{-1} A + C^T R^{-1} C & -A^T Q^{-1} & \hdots & 0 & 0 \\ 0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A + C^T R^{-1} C & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A + C^T R^{-1} C & -A^T Q^{-1} \\ 0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} + C^T R^{-1} C \end{bmatrix}
+ \Sigma^{-1} & = & G^{-T} S^{-1} G^{-1} + H^T T^{-1} H \nonumber \\
+             & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\ -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & \hdots & 0 & 0 \\ 0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\ 0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} \end{bmatrix} \nonumber \\
+             &   & + \: \begin{bmatrix} C^T R^{-1} C & 0 & 0 & \hdots & 0 & 0 \\ 0 & C^T R^{-1} C & 0 & \hdots & 0 & 0 \\ 0 & 0 & C^T R^{-1} C & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & C^T R^{-1} C & 0 \\ 0 & 0 & 0 & \hdots & 0 & C^T R^{-1} C \end{bmatrix}
 \end{IEEEeqnarray}
-}
+
 
 The tasks that remain then are as follows:
 \begin{itemize}
