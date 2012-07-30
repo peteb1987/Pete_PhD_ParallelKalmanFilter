@@ -1,4 +1,4 @@
-This is pdfTeX, Version 3.1415926-1.40.11 (MiKTeX 2.9) (preloaded format=pdflatex 2012.1.9)  30 JUL 2012 15:36
+This is pdfTeX, Version 3.1415926-1.40.11 (MiKTeX 2.9) (preloaded format=pdflatex 2012.1.9)  30 JUL 2012 16:24
 entering extended mode
 **ParallelKalmanFilter.tex
 (D:\pb404\Research\BatchParallelKalmanFilter\ParallelKalmanFilter.tex
@@ -144,38 +144,38 @@ Overfull \hbox (57.79295pt too wide) in alignment at lines 105--107
  []
 
 
-Overfull \hbox (115.31761pt too wide) in alignment at lines 127--146
+Overfull \hbox (115.31761pt too wide) in alignment at lines 131--150
  [] [] [] [][]
  []
 
 [3]
-Overfull \hbox (34.16649pt too wide) in alignment at lines 160--164
+Overfull \hbox (34.16649pt too wide) in alignment at lines 164--168
  [] [] [] [][]
  []
 
 [4]
-Overfull \hbox (82.33362pt too wide) in alignment at lines 176--181
+Overfull \hbox (82.33362pt too wide) in alignment at lines 180--185
  [] [] [] [][]
  []
 
 [5]
-Overfull \hbox (115.31761pt too wide) in alignment at lines 198--217
+Overfull \hbox (115.31761pt too wide) in alignment at lines 202--221
  [] [] [] [][]
  []
 
-LaTeX Font Info:    Try loading font information for OMS+cmr on input line 224.
+LaTeX Font Info:    Try loading font information for OMS+cmr on input line 228.
 
 ("C:\Program Files (x86)\MiKTeX 2.9\tex\latex\base\omscmr.fd"
 File: omscmr.fd 1999/05/25 v2.5h Standard LaTeX font definitions
 )
 LaTeX Font Info:    Font shape `OMS/cmr/m/n' in size <10> not available
-(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 224.
+(Font)              Font shape `OMS/cmsy/m/n' tried instead on input line 228.
  [6] [7] [8]
 [9] (D:\pb404\Research\BatchParallelKalmanFilter\ParallelKalmanFilter.aux) ) 
 Here is how much of TeX's memory you used:
  1167 strings out of 494019
  16345 string characters out of 3143883
- 85803 words of memory out of 3000000
+ 86803 words of memory out of 3000000
  4505 multiletter control sequences out of 15000+200000
  8408 words of font info for 31 fonts, out of 3000000 for 9000
  714 hyphenation exceptions out of 8191
@@ -191,7 +191,7 @@ es (x86)/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr12.pfb><C:/Program Files
 6)/MiKTeX 2.9/fonts/type1/public/amsfonts/cm/cmr7.pfb><C:/Program Files (x86)/M
 iKTeX 2.9/fonts/type1/public/amsfonts/cm/cmsy10.pfb><C:/Program Files (x86)/MiK
 TeX 2.9/fonts/type1/public/amsfonts/cm/cmsy7.pfb>
-Output written on ParallelKalmanFilter.pdf (9 pages, 146950 bytes).
+Output written on ParallelKalmanFilter.pdf (9 pages, 147076 bytes).
 PDF statistics:
  72 PDF objects out of 1000 (max. 8388607)
  0 named destinations out of 1000 (max. 500000)

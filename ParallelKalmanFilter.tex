@@ -119,6 +119,10 @@ This looks horrible, but it turns out that it all collapses deliciously to almos
 \qquad & = & \begin{bmatrix} Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} & 0 & \hdots & 0 \\
                              0 & 0 & \hdots & 0 \\
                              \vdots & \vdots & \ddots & \vdots \\
+                             0 & 0 & \hdots & 0 \end{bmatrix} \nonumber \\
+       & = & \begin{bmatrix} Q^{-1} - (Q + A P_0 A^T)^{-1} & 0 & \hdots & 0 \\
+                             0 & 0 & \hdots & 0 \\
+                             \vdots & \vdots & \ddots & \vdots \\
                              0 & 0 & \hdots & 0 \end{bmatrix}     .
 \end{IEEEeqnarray}
 
@@ -132,7 +136,7 @@ Thus we can write,
                                    \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
                                    0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\
                                    0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A \end{bmatrix} \nonumber \\
-             &   & + \: \begin{bmatrix} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+             &   & + \: \begin{bmatrix} (Q + A P_0 A^T)^{-1} - Q^{-1} & 0 & \hdots & 0 & 0 \\
                              0 & 0 & \hdots & 0 & 0\\
                              \vdots & \vdots & \ddots & \vdots & \vdots \\
                              0 & 0 & \hdots & 0 & 0 \\
@@ -203,7 +207,7 @@ We have the following matrixes,
                                    \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
                                    0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\
                                    0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A \end{bmatrix} \nonumber \\
-             &   & + \: \begin{bmatrix} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+             &   & + \: \begin{bmatrix} (Q + A P_0 A^T)^{-1} - Q^{-1} & 0 & \hdots & 0 & 0 \\
                              0 & 0 & \hdots & 0 & 0\\
                              \vdots & \vdots & \ddots & \vdots & \vdots \\
                              0 & 0 & \hdots & 0 & 0 \\

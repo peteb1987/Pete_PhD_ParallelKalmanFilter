@@ -248,9 +248,70 @@ The matrix equation, $\Sigma^{-1} \mu = \xi$, can then be written as $N$ simulta
  \beta^T \mu_2 + \alpha \mu_3 + \beta \mu_4 & = & \xi_3 \nonumber \\
  & \vdots & \nonumber \\
  \beta^T \mu_{N-2} + \alpha \mu_{N-1} + \beta \mu_{N} & = & \xi_{N-1} \nonumber \\
- \beta^T \mu_{N-1} + \delta \mu_{N} & = & \xi_{N} \nonumber
+ \beta^T \mu_{N-1} + \delta \mu_{N} & = & \xi_{N} \nonumber     .
 \end{IEEEeqnarray}
 
+These may be solved numerically. The first equation defines $\mu_2$ in terms of $\mu_1$. Using this, the second equation defines $\mu_3$ in terms of $\mu_1$. Progressing sequentially through the list, the $(N-1)$th and $N$th equations both define $\mu_N$ in terms of $\mu_1$. Thus we have two equations in terms of two unknowns ($\mu_1$ and $\mu_N$) which may be solved completely. The value for $\mu_1$ is then substituted into the intermediate expressions to yield the entire $\mu$ vector.
+
+This method superficially resembles a Kalman smoother, consisting of a forward pass through the data followed by a second, back-substitution phase. Unlike a Kalman smoother, the second phase is easily and fully parallelisable (i.e. it may be conducted in $\mathcal{O}(1)$ time with $>N$ processors). The first step, however, is innately sequential, and a dumb implementation would still require $\mathcal{O}(N)$ time.
+
+We devise a parallel implementation of the first phase by repeatedly partitioning the data in a similar manner to the FFT, QuikSort, etc. Consider dividing the data into 2 sets, from $1,\hdots,K$ and from $K+1,\hdots,N$. Using the first $K$ equations as before, we can write down relations numerically defining $\mu_K$ and $\mu_{K+1}$ in terms of $\mu_1$. Meanwhile, we use the remaining $N-K$ equations to write down two relations numerically defining $\mu_N$ in terms of $\mu_{K}$ and $\mu_{K+1}$. These two sets may be processed entirely in parallel. It is then a small task to substitute the former into the latter and hence calculate a value for $\mu_1$. The time for the first, parallel part would be $\mathcal{O}(N/2)$ and that for the second, joining part $\mathcal{O}(1)$.
+
+Instead of dividing the data into two sets, we could divide it into $M$ sets. The time for the parallel part would then be $\mathcal{O}(N/M)$ and that for the second part $\mathcal{O}(M)$. By choosing $M \approx \sqrt{N}$, we achieve a total complexity of $\mathcal{O}(\sqrt{N})$. Alternatively, we could recursively bisect the interval, leading to a complexity of $\mathcal{O}(\log_2(N))$ (I haven't checked this rigorously, but i'm pretty sure it is).
+
+Things don't get too much more complicated for the covariance matrix,
+%
+\begin{IEEEeqnarray}{rCl}
+ \Sigma^{-1} \Sigma & = & I
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+\begin{bmatrix} \gamma  & \beta   &        &         &         &        \\
+                \beta^T & \alpha  & \beta  &         &         &        \\
+                        & \beta^T & \alpha & \ddots  &         &        \\
+                        &         & \ddots & \ddots  & \beta   &        \\
+                        &         &        & \beta^T & \alpha  & \beta  \\
+                        &         &        &         & \beta^T & \delta \end{bmatrix}
+\begin{bmatrix} \sigma_1       & \sigma_{1,2}   & \sigma_{1,3}   & \hdots & \sigma_{1,N}   \\
+                \sigma_{1,2}   & \sigma_{2}     & \sigma_{2,3}   & \hdots & \sigma_{2,N}   \\
+                \sigma_{1,3}   & \sigma_{2,3}   & \sigma_{3}     & \hdots & \sigma_{3,N}   \\
+                \vdots         & \vdots         & \vdots         & \ddots & \vdots         \\
+                \sigma_{1,N}   & \sigma_{2,N}   & \sigma_{3,N}   & \hdots & \sigma_{N,N}   \\
+\end{bmatrix}
+ & = & I \nonumber     .
+\end{IEEEeqnarray}
+
+We use a subset of $3N-2$ of the available equations,
+%
+\begin{IEEEeqnarray}{rCl}
+ \gamma \sigma_{1}   + \beta \sigma_{1,2} & = & I \nonumber \\
+ \gamma \sigma_{1,2} + \beta \sigma_{2}   & = & 0 \nonumber \\
+ %\gamma \sigma_{1,3} + \beta \sigma_{2,3} & = & 0 \nonumber \\
+ & & \nonumber \\
+ \beta^T \sigma_{1}   + \alpha \sigma_{1,2} + \beta \sigma_{1,3} & = & 0\nonumber \\
+ \beta^T \sigma_{1,2} + \alpha \sigma_{2}   + \beta \sigma_{2,3} & = & I\nonumber \\
+ \beta^T \sigma_{1,3} + \alpha \sigma_{2,3} + \beta \sigma_{3}   & = & 0\nonumber \\
+ & & \nonumber \\
+ \beta^T \sigma_{2}   + \alpha \sigma_{2,3} + \beta \sigma_{2,4} & = & 0\nonumber \\
+ \beta^T \sigma_{2,3} + \alpha \sigma_{3}   + \beta \sigma_{3,4} & = & I\nonumber \\
+ \beta^T \sigma_{2,4} + \alpha \sigma_{3,4} + \beta \sigma_{4}   & = & 0\nonumber \\
+ & \vdots & \nonumber \\
+ \beta^T \sigma_{N-2}     + \alpha \sigma_{N-2,N-1} + \beta \sigma_{N-2,N} & = & 0\nonumber \\
+ \beta^T \sigma_{N-2,N-1} + \alpha \sigma_{N-1}     + \beta \sigma_{N-1,N} & = & I\nonumber \\
+ \beta^T \sigma_{N-2,N}   + \alpha \sigma_{N-1,N}   + \beta \sigma_{N}   & = & 0\nonumber \\
+ & & \nonumber \\
+ \beta^T \sigma_{N-1}   + \delta \sigma_{N-1,N} & = & 0\nonumber \\
+ \beta^T \sigma_{N-1,N} + \delta \sigma_{N}     & = & I\nonumber      .
+\end{IEEEeqnarray}
+
+In the same manner as the $\mu$s, we can cascade through these numerically to get two equations in two unknowns ($\sigma_1$ and $\sigma_N$). In the above, the $n$th block corresponds to the $n$th row of $\Sigma^{-1}$, and allows us to calculate $\sigma_{n-1,n+1}$, $\sigma_{n,n+1}$ and $\sigma_{n+1}$ (excepting the first and last blocks). The last block gives us a second constraint for $\sigma_N$. A similar back substitution phase then follows.
+
+This procedure is $\mathcal{O}(N)$ (or rather $\mathcal{O}(3N)$ to be precise) but it may be parallelised in the same way as the mean calculation. To start at the $(K+1)$th step, we need to assume $\sigma_{K}$, $\sigma_{K+1}$ and $\sigma_{K,K+1}$ are known.
+
+
+
+\section{Fourier Transform Method}
+
+Rich has details of this. Its efficacy depends on whether the parallel FFT is $\mathcal{O}(N)$ or $\mathcal{O}(\log_2(N))$, which we need to investigate.
 
 
 
