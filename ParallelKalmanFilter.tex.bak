@@ -15,7 +15,7 @@
 
 Sometimes we want to run a Kalman filter offline, for example when using Rao-Blackwellisation in an MCMC algorithm, such as the MCMC-DA system for target tracking. In this case, the sequential nature of the Kalman filter prevents it from being easily parallelisable. Here we try to fix that.
 
-\section{System Equations}
+\section{An Offline Formulation of the Kalman Filter}
 
 Consider a standard discrete-time linear-Gaussian state-space model,
 %
@@ -27,14 +27,231 @@ Consider a standard discrete-time linear-Gaussian state-space model,
  w_n & \sim & \mathcal{N}(.|0, Q) \\
  v_n & \sim & \mathcal{N}(.|0, R)
 \end{IEEEeqnarray}
-
-For now, we assume that the starting state, $x_0$ is fixed and known. We'll want to relax this condition later.
+\begin{IEEEeqnarray}{rCl}
+ x_0 & \sim & \mathcal{N}(.|m_0, P_0)     .
+\end{IEEEeqnarray}
 
 We can stack up all $N$ of the state and observation equations into matrix equations,
 %
 \begin{IEEEeqnarray}{rCl}
- \begin{bmatrix}x_1 \\ x_2 \\ \vdots \\ x_N \end{bmatrix} & = & \begin{bmatrix}A \\ A^2 \\ \vdots \\ A^N \end{bmatrix} x_0 + \begin{bmatrix} I & 0 & 0 & \hdots & 0 \\ A & I & 0 & \hdots & 0 \\ A^2 & A & I & \hdots & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots \\ A^N & A^{N-1} & A^{N-2} & \hdots & I \end{bmatrix} \begin{bmatrix} w_1 \\ w_2 \\ w_3 \\ \vdots \\ w_N \end{bmatrix}
+ \underbrace{\begin{bmatrix}x_1 \\ x_2 \\ x_3 \\ \vdots \\ x_N \end{bmatrix}}_{X} & = & \underbrace{\begin{bmatrix}A \\ A^2 \\ A^3 \\ \vdots \\ A^N \end{bmatrix}}_{F} x_0 + \underbrace{\begin{bmatrix} I & 0 & 0 & \hdots & 0 \\ A & I & 0 & \hdots & 0 \\ A^2 & A & I & \hdots & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots \\ A^N & A^{N-1} & A^{N-2} & \hdots & I \end{bmatrix}}_{G} \underbrace{\begin{bmatrix} w_1 \\ w_2 \\ w_3 \\ \vdots \\ w_N \end{bmatrix}}_{W}
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ \underbrace{\begin{bmatrix}y_1 \\ \vdots \\ y_N \end{bmatrix}}_{Y} & = & \underbrace{\begin{bmatrix}C & & \\ & \ddots & \\ & & C \end{bmatrix}}_{H} \underbrace{\begin{bmatrix}x_1 \\ \vdots \\ x_N \end{bmatrix}}_{X} + \underbrace{\begin{bmatrix} v_1 \\ \vdots \\ v_N \end{bmatrix}}_{V}     .
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ W & \sim & \mathcal{N}\left(.|0, \underbrace{\begin{bmatrix}Q & & \\ & \ddots & \\ & & Q \end{bmatrix}}_{S} \right) \\
+ C & \sim & \mathcal{N}\left(.|0, \underbrace{\begin{bmatrix}R & & \\ & \ddots & \\ & & R \end{bmatrix}}_{T} \right)     .
+\end{IEEEeqnarray}
+
+This gives us the following distributions,
+%
+\begin{IEEEeqnarray}{rCl}
+ p(X|x_0) & = & \mathcal{N}(X|F x_0, GSG^T) \\
+ p(Y|X)   & = & \mathcal{N}(Y|H X, T) \\
+ p(x_0)   & = & \mathcal{N}(x_0|m_0, P_0)     .
+\end{IEEEeqnarray}
+
+Now its time for Bayes and some marginalisation,
+%
+\begin{IEEEeqnarray}{rCl}
+ p(X|Y) & = & \frac{p(Y|X) p(X)}{p(Y)} \nonumber \\
+        & = & \frac{p(Y|X) \int p(X|x_0) p(x_0)}{p(Y)} \nonumber \\
+        & = & \mathcal{N}(X|\mu,\Sigma)     .
+\end{IEEEeqnarray}
+
+This makes use of the two following little Gaussian identities (arbitrary notation),
+%
+\begin{IEEEeqnarray}{rCl}
+ \int \mathcal{N}(y|C x, R) \mathcal{N}(x|\mu, \Sigma) dx & = & \mathcal{N}(y|C \mu, C \Sigma C^T + R) \nonumber \\
+ \mathcal{N}(y|C x, R) \mathcal{N}(x|\mu, \Sigma) & \propto & \mathcal{N}(x|\left[ C^T R^{-1} C + \Sigma^{-1} \right]^{-1} \left[ C^T R^{-1} y + \Sigma^{-1} \mu \right], \left[ C^T R^{-1} C + \Sigma^{-1} \right]^{-1} ) \nonumber     .
+\end{IEEEeqnarray}
+
+%For completeness, here's the derivation of $\mu$ and $\Sigma$ in full. Its pretty standard completing the square, throughout which we though away constant terms knowing that they'll come out in the wash when we normalise.
+%%
+%\begin{IEEEeqnarray*}{rCl}
+% p(X|Y) & \propto & \frac{p(Y|X) \int p(X|x_0) p(x_0)}{p(Y)} \nonumber \\
+%        & = & \mathcal{N}(X|F x_0,G S G^T) \mathcal{N}(Y|H X,T) \\
+%        & \propto & \exp\left\{ -\frac{1}{2} \left[ (X-F x_0)^T (GSG^T)^{-1} (X-F x_0) + (Y-H X)^T T^{-1} (Y-H X) \right] \right\} \\
+%        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T (GSG^T)^{-1} X - 2x_0^T F^T (GSG^T)^{-1} X + X^T H^T T^{-1} H X - 2 Y^T T^{-1} H X \right] \right\} \\
+%        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T \left( (GSG^T)^{-1} + H^T T^{-1} H \right) X - 2 \left( x_0^T F^T (GSG^T)^{-1} + Y^T T^{-1} H \right) X \right] \right\} \\
+%        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T \Sigma^{-1} X - 2 \mu^T \Sigma^{-1} X \right] \right\}     .
+%\end{IEEEeqnarray*}
+
+The moments of the posterior Gaussian are given by.
+%
+\begin{IEEEeqnarray}{rCl}
+ \Sigma & = & \left[ (G S G^T + F P_0 F^T)^{-1} + H^T T^{-1} H \right]^{-1} \\
+ \mu    & = & \Sigma \left[ (G S G^T + F P_0 F^T)^{-1} F x_0 + H^T T^{-1} Y \right]     .
+\end{IEEEeqnarray}
+
+Good. $\mu$ is the vector of concatenated posterior means for each state. $\Sigma$ is the complete covariance matrix for all states over time. To replicate a Kalman smoother, we only need the blocks on the diagonal of this matrix. The other blocks are the covariances between states at different times, and are less interesting.
+
+$\Sigma^{-1}$ is highly structured, and in fact we can right is out explicitly. $G$ is square and clearly full rank (because $A$ has to be full rank for a valid HMM), and it turns out that its inverse has the following wizard form,
+%
+\begin{IEEEeqnarray}{rCl}
+ G^{-1} & = & \begin{bmatrix} I & 0 & 0 & \hdots & 0 & 0 \\ -A & I & 0 & \hdots & 0 & 0 \\ 0 & -A & I & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & I & 0 \\ 0 & 0 & 0 & \hdots & -A & I \end{bmatrix}     .
+\end{IEEEeqnarray}
+
+Hence,
+%
+\begin{IEEEeqnarray}{rCl}
+ \IEEEeqnarraymulticol{3}{l}{ (G S G^T)^{-1} = G^{-T} S^{-1} G^{-1} }  \\
+                & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\ -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & \hdots & 0 & 0 \\ 0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\ 0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} \end{bmatrix} \nonumber     .
+\end{IEEEeqnarray}
+
+Now expand using the Woodbury identity,
+%
+\begin{IEEEeqnarray}{rCl}
+ (G S G^T + F P_0 F^T)^{-1} & = & (G S G^T)^{-1} - (G S G^T)^{-1} F (P_0^{-1} + F^T (G S G^T)^{-1} F)^{-1} F^T (G S G^T)^{-1}     .
+\end{IEEEeqnarray}
+
+This looks horrible, but it turns out that it all collapses deliciously to almost nothing,
+%
+\begin{IEEEeqnarray}{rCl}
+ (G S G^T)^{-1} F & = & \begin{bmatrix} Q^{-1} A \\ 0 \\ \vdots \\ 0 \end{bmatrix}
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ F^T (G S G^T)^{-1} F & = & A^T Q^{-1} A
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+\IEEEeqnarraymulticol{3}{l}{ (G S G^T)^{-1} F (P_0^{-1} + F^T (G S G^T)^{-1} F)^{-1} F^T (G S G^T)^{-1} } \nonumber \\
+\qquad & = & \begin{bmatrix} Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} & 0 & \hdots & 0 \\
+                             0 & 0 & \hdots & 0 \\
+                             \vdots & \vdots & \ddots & \vdots \\
+                             0 & 0 & \hdots & 0 \end{bmatrix}     .
+\end{IEEEeqnarray}
+
+Thus we can write,
+%
+\begin{IEEEeqnarray}{rCl}
+ \Sigma^{-1} & = & \left[ (G S G^T + F P_0 F^T)^{-1} + H^T T^{-1} H \right] \nonumber \\
+             & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+                                  -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & \hdots & 0 & 0 \\
+                                   0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & \vdots & 0 & 0 \\
+                                   \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
+                                   0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\
+                                   0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A \end{bmatrix} \nonumber \\
+             &   & + \: \begin{bmatrix} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+                             0 & 0 & \hdots & 0 & 0\\
+                             \vdots & \vdots & \ddots & \vdots & \vdots \\
+                             0 & 0 & \hdots & 0 & 0 \\
+                             0 & 0 & \hdots & 0 & - A^T Q^{-1} A \end{bmatrix} \nonumber \\
+        &   & + \: \begin{bmatrix} C^T R^{-1} C & 0 & 0 & \hdots & 0 & 0 \\
+                                   0 & C^T R^{-1} C & 0 & \hdots & 0 & 0 \\
+                                   0 & 0 & C^T R^{-1} C & \vdots & 0 & 0 \\
+                                   \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
+                                   0 & 0 & 0 & \hdots & C^T R^{-1} C & 0 \\
+                                   0 & 0 & 0 & \hdots & 0 & C^T R^{-1} C \end{bmatrix}     .
+\end{IEEEeqnarray}
+
+Thus $\Sigma^{-1}$ has a nice sparse, tridiagonal structure, composed of a Toeplitz matrix, and two diagonal matrixes.
+
+The blocks of the inverse covariance matrix represent conditional coprecisions. The diagonal terms represent the precision of an estimate given the preceding state (which contributes $Q^{-1}$) the following state (which contributes $A^T Q^{-1} A$) and the corresponding observation (which contributes $C^T R^{-1} C$). This explains why all diagonal terms are the same except the final one (for which there is no next state) and the first one (for which the previous state has a different covariance). Note that if the initial state is unknown (large diagonal entries in $P_0$), then initial condition correction becomes $-Q^{-1}$, cancelling out the term corresponding to information from the previous state. On the other hand, if the initial state is known (small diagonal entries in $P_0$), then the correction term disappears.
+
+We can also simplify the mean calculation. Consider the vector $\xi$:
+
+\begin{IEEEeqnarray}{rCl}
+ \xi & = & \left[ (G S G^T + F P_0 F^T)^{-1} F x_0 + H^T T^{-1} Y \right] \nonumber     .
+\end{IEEEeqnarray}
+
+For $n \ne 1,N$,
+
+\begin{IEEEeqnarray}{rCl}
+ \xi_n & = & -Q^{-1} A \left( A^{n-1} m_0 \right) + \left( Q^{-1} + A^T Q^{-1} A \right) \left( A^{n} m_0 \right) - A^T Q^{-1} \left( A^{n+1} m_0 \right) + C^T R^{-1} y_n \nonumber \\
+       & = & \left[ -Q^{-1} +Q^{-1} + A^T Q^{-1} A - A^T Q^{-1} A \right] A^{n} m_0  + C^T R^{-1} y_n \nonumber \\
+       & = & C^T R^{-1} y_n     .
+\end{IEEEeqnarray}
+
+For $n = N$,
+
+\begin{IEEEeqnarray}{rCl}
+ \xi_N & = & -Q^{-1} A \left( A^{N-1} m_0 \right) + Q^{-1} A^{N} m_0  + C^T R^{-1} y_N \nonumber \\
+       & = & \left[ -Q^{-1} + Q^{-1} \right] A^{N} m_0  + C^T R^{-1} y_N \nonumber \\
+       & = & C^T R^{-1} y_N     .
+\end{IEEEeqnarray}
+
+For $n = 1$,
+
+\begin{IEEEeqnarray}{rCl}
+ \xi_1 & = & \left( Q^{-1} + A^T Q^{-1} A - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} \right) \left( A m_0 \right) - A^T Q^{-1} \left( A^2 m_0 \right) + C^T R^{-1} y_1 \nonumber \\
+       & = & \left[ Q^{-1} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} + A^T Q^{-1} A - A^T Q^{-1} A \right] A m_0  + C^T R^{-1} y_1 \nonumber \\
+       & = & \left[ Q^{-1} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} \right] A m_0 + C^T R^{-1} y_1 \nonumber \\
+       & = & (Q + A P_0 A^T)^{-1} A m_0 + C^T R^{-1} y_1      .
+\end{IEEEeqnarray}
+
+Hence, $\xi$ simplifies to,
+
+\begin{IEEEeqnarray}{rCl}
+ \xi & = & \begin{bmatrix} C^T R^{-1} y_1 \\ C^T R^{-1} y_2 \\ \vdots \\ C^T R^{-1} y_N \end{bmatrix} + \begin{bmatrix} (Q + A P_0 A^T)^{-1} A m_0 \\ 0 \\ \vdots \\ 0 \end{bmatrix}     .
 \end{IEEEeqnarray}
 
 
-\end{document}
+
+
+
+\newpage
+\section{Problem Summary}
+
+We have the following matrixes,
+%
+\begin{IEEEeqnarray}{rCl}
+ \Sigma^{-1} & = & \left[ (G S G^T + F P_0 F^T)^{-1} + H^T T^{-1} H \right] \nonumber \\
+             & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+                                  -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & \hdots & 0 & 0 \\
+                                   0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & \vdots & 0 & 0 \\
+                                   \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
+                                   0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\
+                                   0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A \end{bmatrix} \nonumber \\
+             &   & + \: \begin{bmatrix} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+                             0 & 0 & \hdots & 0 & 0\\
+                             \vdots & \vdots & \ddots & \vdots & \vdots \\
+                             0 & 0 & \hdots & 0 & 0 \\
+                             0 & 0 & \hdots & 0 & - A^T Q^{-1} A \end{bmatrix} \nonumber \\
+        &   & + \: \begin{bmatrix} C^T R^{-1} C & 0 & 0 & \hdots & 0 & 0 \\
+                                   0 & C^T R^{-1} C & 0 & \hdots & 0 & 0 \\
+                                   0 & 0 & C^T R^{-1} C & \vdots & 0 & 0 \\
+                                   \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
+                                   0 & 0 & 0 & \hdots & C^T R^{-1} C & 0 \\
+                                   0 & 0 & 0 & \hdots & 0 & C^T R^{-1} C \end{bmatrix}     
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ \xi & = & \begin{bmatrix} C^T R^{-1} y_1 \\ C^T R^{-1} y_2 \\ \vdots \\ C^T R^{-1} y_N \end{bmatrix} + \begin{bmatrix} (Q + A P_0 A^T)^{-1} A m_0 \\ 0 \\ \vdots \\ 0 \end{bmatrix}     .
+\end{IEEEeqnarray}
+
+The tasks that remain are as follows:
+\begin{itemize}
+  \item Calculate the diagonal blocks of $\Sigma$.
+  \item Solve the system of equations $\Sigma^{-1} \mu = \xi$ to give us $\mu$.
+\end{itemize}
+
+These will give us the same covariance matrixes and means generated by the Kalman filter.
+
+\section{Direct Method}
+
+We write the inverse covariance matrix as,
+%
+\begin{IEEEeqnarray}{rCl}
+ \Sigma^{-1} & = & \begin{bmatrix} \gamma  & \beta   &        &         &         &        \\
+                                   \beta^T & \alpha  & \beta  &         &         &        \\
+                                           & \beta^T & \alpha & \ddots  &         &        \\
+                                           &         & \ddots & \ddots  & \beta   &        \\
+                                           &         &        & \beta^T & \alpha  & \beta  \\
+                                           &         &        &         & \beta^T & \delta \end{bmatrix}     .
+\end{IEEEeqnarray}
+
+The matrix equation, $\Sigma^{-1} \mu = \xi$, can then be written as $N$ simultaneous equations,
+%
+\begin{IEEEeqnarray}{rCl}
+ \gamma \mu_1 + \beta \mu_2 & = & \xi_1 \nonumber \\
+ \beta^T \mu_1 + \alpha \mu_2 + \beta \mu_3 & = & \xi_2 \nonumber \\
+ \beta^T \mu_2 + \alpha \mu_3 + \beta \mu_4 & = & \xi_3 \nonumber \\
+ & \vdots & \nonumber \\
+ \beta^T \mu_{N-2} + \alpha \mu_{N-1} + \beta \mu_{N} & = & \xi_{N-1} \nonumber \\
+ \beta^T \mu_{N-1} + \delta \mu_{N} & = & \xi_{N} \nonumber
+\end{IEEEeqnarray}
+
+
+
+
+\end{document} 

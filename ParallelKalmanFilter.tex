@@ -15,7 +15,7 @@
 
 Sometimes we want to run a Kalman filter offline, for example when using Rao-Blackwellisation in an MCMC algorithm, such as the MCMC-DA system for target tracking. In this case, the sequential nature of the Kalman filter prevents it from being easily parallelisable. Here we try to fix that.
 
-\section{System Equations}
+\section{An Offline Formulation of the Kalman Filter}
 
 Consider a standard discrete-time linear-Gaussian state-space model,
 %
@@ -25,10 +25,11 @@ Consider a standard discrete-time linear-Gaussian state-space model,
 \end{IEEEeqnarray}
 \begin{IEEEeqnarray}{rCl}
  w_n & \sim & \mathcal{N}(.|0, Q) \\
- v_n & \sim & \mathcal{N}(.|0, R)     .
+ v_n & \sim & \mathcal{N}(.|0, R)
 \end{IEEEeqnarray}
-
-For now, we assume that the starting state, $x_0$ is fixed and known. We'll want to relax this condition later.
+\begin{IEEEeqnarray}{rCl}
+ x_0 & \sim & \mathcal{N}(.|m_0, P_0)     .
+\end{IEEEeqnarray}
 
 We can stack up all $N$ of the state and observation equations into matrix equations,
 %
@@ -46,35 +47,45 @@ We can stack up all $N$ of the state and observation equations into matrix equat
 This gives us the following distributions,
 %
 \begin{IEEEeqnarray}{rCl}
- X & \sim & \mathcal{N}(.|F x_0,GSG^T) \\
- Y & \sim & \mathcal{N}(.|H X,T)     .
+ p(X|x_0) & = & \mathcal{N}(X|F x_0, GSG^T) \\
+ p(Y|X)   & = & \mathcal{N}(Y|H X, T) \\
+ p(x_0)   & = & \mathcal{N}(x_0|m_0, P_0)     .
 \end{IEEEeqnarray}
 
-Now its time for Bayes,
+Now its time for Bayes and some marginalisation,
 %
 \begin{IEEEeqnarray}{rCl}
- P(X|Y) & = & \frac{P(Y|X)P(X)}{P(Y)} \\
+ p(X|Y) & = & \frac{p(Y|X) p(X)}{p(Y)} \nonumber \\
+        & = & \frac{p(Y|X) \int p(X|x_0) p(x_0)}{p(Y)} \nonumber \\
         & = & \mathcal{N}(X|\mu,\Sigma)     .
 \end{IEEEeqnarray}
 
-For completeness, here's the derivation of $\mu$ and $\Sigma$ in full. Its pretty standard completing the square, throughout which we though away constant terms knowing that they'll come out in the wash when we normalise.
+This makes use of the two following little Gaussian identities (arbitrary notation),
 %
-\begin{IEEEeqnarray*}{rCl}
- P(X|Y) & \propto & P(Y|X) P(X) \\
-        & = & \mathcal{N}(X|F x_0,GSG^T) \mathcal{N}(Y|H X,T) \\
-        & \propto & \exp\left\{ -\frac{1}{2} \left[ (X-F x_0)^T (GSG^T)^{-1} (X-F x_0) + (Y-H X)^T T^{-1} (Y-H X) \right] \right\} \\
-        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T (GSG^T)^{-1} X - 2x_0^T F^T (GSG^T)^{-1} X + X^T H^T T^{-1} H X - 2 Y^T T^{-1} H X \right] \right\} \\
-        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T \left( (GSG^T)^{-1} + H^T T^{-1} H \right) X - 2 \left( x_0^T F^T (GSG^T)^{-1} + Y^T T^{-1} H \right) X \right] \right\} \\
-        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T \Sigma^{-1} X - 2 \mu^T \Sigma^{-1} X \right] \right\}     .
-\end{IEEEeqnarray*}
-
-Comparing terms gives us,
 \begin{IEEEeqnarray}{rCl}
- \Sigma & = & \left[ (GSG^T)^{-1} + H^T T^{-1} H \right]^{-1} \\
- \mu    & = & \Sigma \left[ (GSG^T)^{-1} F x_0 + H^T T^{-1} Y \right]     .
+ \int \mathcal{N}(y|C x, R) \mathcal{N}(x|\mu, \Sigma) dx & = & \mathcal{N}(y|C \mu, C \Sigma C^T + R) \nonumber \\
+ \mathcal{N}(y|C x, R) \mathcal{N}(x|\mu, \Sigma) & \propto & \mathcal{N}(x|\left[ C^T R^{-1} C + \Sigma^{-1} \right]^{-1} \left[ C^T R^{-1} y + \Sigma^{-1} \mu \right], \left[ C^T R^{-1} C + \Sigma^{-1} \right]^{-1} ) \nonumber     .
 \end{IEEEeqnarray}
 
-Good. $\mu$ is the vector of posterior means for each state. $\Sigma$ is the complete covariance matrix for all states over time. To replicate a Kalman smoother, we only need the blocks on the diagonal of this matrix. The other blocks are the covariances between states at different times, and are less interesting.
+%For completeness, here's the derivation of $\mu$ and $\Sigma$ in full. Its pretty standard completing the square, throughout which we though away constant terms knowing that they'll come out in the wash when we normalise.
+%%
+%\begin{IEEEeqnarray*}{rCl}
+% p(X|Y) & \propto & \frac{p(Y|X) \int p(X|x_0) p(x_0)}{p(Y)} \nonumber \\
+%        & = & \mathcal{N}(X|F x_0,G S G^T) \mathcal{N}(Y|H X,T) \\
+%        & \propto & \exp\left\{ -\frac{1}{2} \left[ (X-F x_0)^T (GSG^T)^{-1} (X-F x_0) + (Y-H X)^T T^{-1} (Y-H X) \right] \right\} \\
+%        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T (GSG^T)^{-1} X - 2x_0^T F^T (GSG^T)^{-1} X + X^T H^T T^{-1} H X - 2 Y^T T^{-1} H X \right] \right\} \\
+%        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T \left( (GSG^T)^{-1} + H^T T^{-1} H \right) X - 2 \left( x_0^T F^T (GSG^T)^{-1} + Y^T T^{-1} H \right) X \right] \right\} \\
+%        & \propto & \exp\left\{ -\frac{1}{2} \left[ X^T \Sigma^{-1} X - 2 \mu^T \Sigma^{-1} X \right] \right\}     .
+%\end{IEEEeqnarray*}
+
+The moments of the posterior Gaussian are given by.
+%
+\begin{IEEEeqnarray}{rCl}
+ \Sigma & = & \left[ (G S G^T + F P_0 F^T)^{-1} + H^T T^{-1} H \right]^{-1} \\
+ \mu    & = & \Sigma \left[ (G S G^T + F P_0 F^T)^{-1} F x_0 + H^T T^{-1} Y \right]     .
+\end{IEEEeqnarray}
+
+Good. $\mu$ is the vector of concatenated posterior means for each state. $\Sigma$ is the complete covariance matrix for all states over time. To replicate a Kalman smoother, we only need the blocks on the diagonal of this matrix. The other blocks are the covariances between states at different times, and are less interesting.
 
 $\Sigma^{-1}$ is highly structured, and in fact we can right is out explicitly. $G$ is square and clearly full rank (because $A$ has to be full rank for a valid HMM), and it turns out that its inverse has the following wizard form,
 %
@@ -82,21 +93,226 @@ $\Sigma^{-1}$ is highly structured, and in fact we can right is out explicitly. 
  G^{-1} & = & \begin{bmatrix} I & 0 & 0 & \hdots & 0 & 0 \\ -A & I & 0 & \hdots & 0 & 0 \\ 0 & -A & I & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & I & 0 \\ 0 & 0 & 0 & \hdots & -A & I \end{bmatrix}     .
 \end{IEEEeqnarray}
 
+Hence,
+%
+\begin{IEEEeqnarray}{rCl}
+ \IEEEeqnarraymulticol{3}{l}{ (G S G^T)^{-1} = G^{-T} S^{-1} G^{-1} }  \\
+                & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\ -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & \hdots & 0 & 0 \\ 0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\ 0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} \end{bmatrix} \nonumber     .
+\end{IEEEeqnarray}
+
+Now expand using the Woodbury identity,
+%
+\begin{IEEEeqnarray}{rCl}
+ (G S G^T + F P_0 F^T)^{-1} & = & (G S G^T)^{-1} - (G S G^T)^{-1} F (P_0^{-1} + F^T (G S G^T)^{-1} F)^{-1} F^T (G S G^T)^{-1}     .
+\end{IEEEeqnarray}
+
+This looks horrible, but it turns out that it all collapses deliciously to almost nothing,
+%
+\begin{IEEEeqnarray}{rCl}
+ (G S G^T)^{-1} F & = & \begin{bmatrix} Q^{-1} A \\ 0 \\ \vdots \\ 0 \end{bmatrix}
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ F^T (G S G^T)^{-1} F & = & A^T Q^{-1} A
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+\IEEEeqnarraymulticol{3}{l}{ (G S G^T)^{-1} F (P_0^{-1} + F^T (G S G^T)^{-1} F)^{-1} F^T (G S G^T)^{-1} } \nonumber \\
+\qquad & = & \begin{bmatrix} Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} & 0 & \hdots & 0 \\
+                             0 & 0 & \hdots & 0 \\
+                             \vdots & \vdots & \ddots & \vdots \\
+                             0 & 0 & \hdots & 0 \end{bmatrix}     .
+\end{IEEEeqnarray}
+
 Thus we can write,
 %
 \begin{IEEEeqnarray}{rCl}
- \Sigma^{-1} & = & G^{-T} S^{-1} G^{-1} + H^T T^{-1} H \nonumber \\
-             & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\ -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & \hdots & 0 & 0 \\ 0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\ 0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} \end{bmatrix} \nonumber \\
-             &   & + \: \begin{bmatrix} C^T R^{-1} C & 0 & 0 & \hdots & 0 & 0 \\ 0 & C^T R^{-1} C & 0 & \hdots & 0 & 0 \\ 0 & 0 & C^T R^{-1} C & \vdots & 0 & 0 \\ \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\ 0 & 0 & 0 & \hdots & C^T R^{-1} C & 0 \\ 0 & 0 & 0 & \hdots & 0 & C^T R^{-1} C \end{bmatrix}
+ \Sigma^{-1} & = & \left[ (G S G^T + F P_0 F^T)^{-1} + H^T T^{-1} H \right] \nonumber \\
+             & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+                                  -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & \hdots & 0 & 0 \\
+                                   0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & \vdots & 0 & 0 \\
+                                   \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
+                                   0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\
+                                   0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A \end{bmatrix} \nonumber \\
+             &   & + \: \begin{bmatrix} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+                             0 & 0 & \hdots & 0 & 0\\
+                             \vdots & \vdots & \ddots & \vdots & \vdots \\
+                             0 & 0 & \hdots & 0 & 0 \\
+                             0 & 0 & \hdots & 0 & - A^T Q^{-1} A \end{bmatrix} \nonumber \\
+        &   & + \: \begin{bmatrix} C^T R^{-1} C & 0 & 0 & \hdots & 0 & 0 \\
+                                   0 & C^T R^{-1} C & 0 & \hdots & 0 & 0 \\
+                                   0 & 0 & C^T R^{-1} C & \vdots & 0 & 0 \\
+                                   \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
+                                   0 & 0 & 0 & \hdots & C^T R^{-1} C & 0 \\
+                                   0 & 0 & 0 & \hdots & 0 & C^T R^{-1} C \end{bmatrix}     .
+\end{IEEEeqnarray}
+
+Thus $\Sigma^{-1}$ has a nice sparse, tridiagonal structure, composed of a Toeplitz matrix, and two diagonal matrixes.
+
+The blocks of the inverse covariance matrix represent conditional coprecisions. The diagonal terms represent the precision of an estimate given the preceding state (which contributes $Q^{-1}$) the following state (which contributes $A^T Q^{-1} A$) and the corresponding observation (which contributes $C^T R^{-1} C$). This explains why all diagonal terms are the same except the final one (for which there is no next state) and the first one (for which the previous state has a different covariance). Note that if the initial state is unknown (large diagonal entries in $P_0$), then initial condition correction becomes $-Q^{-1}$, cancelling out the term corresponding to information from the previous state. On the other hand, if the initial state is known (small diagonal entries in $P_0$), then the correction term disappears.
+
+We can also simplify the mean calculation. Consider the vector $\xi$:
+
+\begin{IEEEeqnarray}{rCl}
+ \xi & = & \left[ (G S G^T + F P_0 F^T)^{-1} F x_0 + H^T T^{-1} Y \right] \nonumber     .
+\end{IEEEeqnarray}
+
+For $n \ne 1,N$,
+
+\begin{IEEEeqnarray}{rCl}
+ \xi_n & = & -Q^{-1} A \left( A^{n-1} m_0 \right) + \left( Q^{-1} + A^T Q^{-1} A \right) \left( A^{n} m_0 \right) - A^T Q^{-1} \left( A^{n+1} m_0 \right) + C^T R^{-1} y_n \nonumber \\
+       & = & \left[ -Q^{-1} +Q^{-1} + A^T Q^{-1} A - A^T Q^{-1} A \right] A^{n} m_0  + C^T R^{-1} y_n \nonumber \\
+       & = & C^T R^{-1} y_n     .
+\end{IEEEeqnarray}
+
+For $n = N$,
+
+\begin{IEEEeqnarray}{rCl}
+ \xi_N & = & -Q^{-1} A \left( A^{N-1} m_0 \right) + Q^{-1} A^{N} m_0  + C^T R^{-1} y_N \nonumber \\
+       & = & \left[ -Q^{-1} + Q^{-1} \right] A^{N} m_0  + C^T R^{-1} y_N \nonumber \\
+       & = & C^T R^{-1} y_N     .
+\end{IEEEeqnarray}
+
+For $n = 1$,
+
+\begin{IEEEeqnarray}{rCl}
+ \xi_1 & = & \left( Q^{-1} + A^T Q^{-1} A - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} \right) \left( A m_0 \right) - A^T Q^{-1} \left( A^2 m_0 \right) + C^T R^{-1} y_1 \nonumber \\
+       & = & \left[ Q^{-1} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} + A^T Q^{-1} A - A^T Q^{-1} A \right] A m_0  + C^T R^{-1} y_1 \nonumber \\
+       & = & \left[ Q^{-1} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} \right] A m_0 + C^T R^{-1} y_1 \nonumber \\
+       & = & (Q + A P_0 A^T)^{-1} A m_0 + C^T R^{-1} y_1      .
+\end{IEEEeqnarray}
+
+Hence, $\xi$ simplifies to,
+
+\begin{IEEEeqnarray}{rCl}
+ \xi & = & \begin{bmatrix} C^T R^{-1} y_1 \\ C^T R^{-1} y_2 \\ \vdots \\ C^T R^{-1} y_N \end{bmatrix} + \begin{bmatrix} (Q + A P_0 A^T)^{-1} A m_0 \\ 0 \\ \vdots \\ 0 \end{bmatrix}     .
 \end{IEEEeqnarray}
 
 
-The tasks that remain then are as follows:
+
+
+
+\newpage
+\section{Problem Summary}
+
+We have the following matrixes,
+%
+\begin{IEEEeqnarray}{rCl}
+ \Sigma^{-1} & = & \left[ (G S G^T + F P_0 F^T)^{-1} + H^T T^{-1} H \right] \nonumber \\
+             & = & \begin{bmatrix} Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+                                  -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} & \hdots & 0 & 0 \\
+                                   0 & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A & \vdots & 0 & 0 \\
+                                   \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
+                                   0 & 0 & 0 & \hdots & Q^{-1} + A^T Q^{-1} A & -A^T Q^{-1} \\
+                                   0 & 0 & 0 & \hdots & -Q^{-1}A & Q^{-1} + A^T Q^{-1} A \end{bmatrix} \nonumber \\
+             &   & + \: \begin{bmatrix} - Q^{-1} A (P_0^{-1} + A^T Q^{-1} A)^{-1} A^T Q^{-1} & 0 & \hdots & 0 & 0 \\
+                             0 & 0 & \hdots & 0 & 0\\
+                             \vdots & \vdots & \ddots & \vdots & \vdots \\
+                             0 & 0 & \hdots & 0 & 0 \\
+                             0 & 0 & \hdots & 0 & - A^T Q^{-1} A \end{bmatrix} \nonumber \\
+        &   & + \: \begin{bmatrix} C^T R^{-1} C & 0 & 0 & \hdots & 0 & 0 \\
+                                   0 & C^T R^{-1} C & 0 & \hdots & 0 & 0 \\
+                                   0 & 0 & C^T R^{-1} C & \vdots & 0 & 0 \\
+                                   \vdots & \vdots & \vdots & \ddots & \vdots & \vdots \\
+                                   0 & 0 & 0 & \hdots & C^T R^{-1} C & 0 \\
+                                   0 & 0 & 0 & \hdots & 0 & C^T R^{-1} C \end{bmatrix}     
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+ \xi & = & \begin{bmatrix} C^T R^{-1} y_1 \\ C^T R^{-1} y_2 \\ \vdots \\ C^T R^{-1} y_N \end{bmatrix} + \begin{bmatrix} (Q + A P_0 A^T)^{-1} A m_0 \\ 0 \\ \vdots \\ 0 \end{bmatrix}     .
+\end{IEEEeqnarray}
+
+The tasks that remain are as follows:
 \begin{itemize}
   \item Calculate the diagonal blocks of $\Sigma$.
-  \item Evaluate the vector $\xi = \left[ (GSG^T)^{-1} F x_0 + H^T T^{-1} Y \right]$.
   \item Solve the system of equations $\Sigma^{-1} \mu = \xi$ to give us $\mu$.
 \end{itemize}
 
+These will give us the same covariance matrixes and means generated by the Kalman filter.
 
-\end{document}
+\section{Direct Method}
+
+We write the inverse covariance matrix as,
+%
+\begin{IEEEeqnarray}{rCl}
+ \Sigma^{-1} & = & \begin{bmatrix} \gamma  & \beta   &        &         &         &        \\
+                                   \beta^T & \alpha  & \beta  &         &         &        \\
+                                           & \beta^T & \alpha & \ddots  &         &        \\
+                                           &         & \ddots & \ddots  & \beta   &        \\
+                                           &         &        & \beta^T & \alpha  & \beta  \\
+                                           &         &        &         & \beta^T & \delta \end{bmatrix}     .
+\end{IEEEeqnarray}
+
+The matrix equation, $\Sigma^{-1} \mu = \xi$, can then be written as $N$ simultaneous equations,
+%
+\begin{IEEEeqnarray}{rCl}
+ \gamma \mu_1 + \beta \mu_2 & = & \xi_1 \nonumber \\
+ \beta^T \mu_1 + \alpha \mu_2 + \beta \mu_3 & = & \xi_2 \nonumber \\
+ \beta^T \mu_2 + \alpha \mu_3 + \beta \mu_4 & = & \xi_3 \nonumber \\
+ & \vdots & \nonumber \\
+ \beta^T \mu_{N-2} + \alpha \mu_{N-1} + \beta \mu_{N} & = & \xi_{N-1} \nonumber \\
+ \beta^T \mu_{N-1} + \delta \mu_{N} & = & \xi_{N} \nonumber     .
+\end{IEEEeqnarray}
+
+These may be solved numerically. The first equation defines $\mu_2$ in terms of $\mu_1$. Using this, the second equation defines $\mu_3$ in terms of $\mu_1$. Progressing sequentially through the list, the $(N-1)$th and $N$th equations both define $\mu_N$ in terms of $\mu_1$. Thus we have two equations in terms of two unknowns ($\mu_1$ and $\mu_N$) which may be solved completely. The value for $\mu_1$ is then substituted into the intermediate expressions to yield the entire $\mu$ vector.
+
+This method superficially resembles a Kalman smoother, consisting of a forward pass through the data followed by a second, back-substitution phase. Unlike a Kalman smoother, the second phase is easily and fully parallelisable (i.e. it may be conducted in $\mathcal{O}(1)$ time with $>N$ processors). The first step, however, is innately sequential, and a dumb implementation would still require $\mathcal{O}(N)$ time.
+
+We devise a parallel implementation of the first phase by repeatedly partitioning the data in a similar manner to the FFT, QuikSort, etc. Consider dividing the data into 2 sets, from $1,\hdots,K$ and from $K+1,\hdots,N$. Using the first $K$ equations as before, we can write down relations numerically defining $\mu_K$ and $\mu_{K+1}$ in terms of $\mu_1$. Meanwhile, we use the remaining $N-K$ equations to write down two relations numerically defining $\mu_N$ in terms of $\mu_{K}$ and $\mu_{K+1}$. These two sets may be processed entirely in parallel. It is then a small task to substitute the former into the latter and hence calculate a value for $\mu_1$. The time for the first, parallel part would be $\mathcal{O}(N/2)$ and that for the second, joining part $\mathcal{O}(1)$.
+
+Instead of dividing the data into two sets, we could divide it into $M$ sets. The time for the parallel part would then be $\mathcal{O}(N/M)$ and that for the second part $\mathcal{O}(M)$. By choosing $M \approx \sqrt{N}$, we achieve a total complexity of $\mathcal{O}(\sqrt{N})$. Alternatively, we could recursively bisect the interval, leading to a complexity of $\mathcal{O}(\log_2(N))$ (I haven't checked this rigorously, but i'm pretty sure it is).
+
+Things don't get too much more complicated for the covariance matrix,
+%
+\begin{IEEEeqnarray}{rCl}
+ \Sigma^{-1} \Sigma & = & I
+\end{IEEEeqnarray}
+\begin{IEEEeqnarray}{rCl}
+\begin{bmatrix} \gamma  & \beta   &        &         &         &        \\
+                \beta^T & \alpha  & \beta  &         &         &        \\
+                        & \beta^T & \alpha & \ddots  &         &        \\
+                        &         & \ddots & \ddots  & \beta   &        \\
+                        &         &        & \beta^T & \alpha  & \beta  \\
+                        &         &        &         & \beta^T & \delta \end{bmatrix}
+\begin{bmatrix} \sigma_1       & \sigma_{1,2}   & \sigma_{1,3}   & \hdots & \sigma_{1,N}   \\
+                \sigma_{1,2}   & \sigma_{2}     & \sigma_{2,3}   & \hdots & \sigma_{2,N}   \\
+                \sigma_{1,3}   & \sigma_{2,3}   & \sigma_{3}     & \hdots & \sigma_{3,N}   \\
+                \vdots         & \vdots         & \vdots         & \ddots & \vdots         \\
+                \sigma_{1,N}   & \sigma_{2,N}   & \sigma_{3,N}   & \hdots & \sigma_{N,N}   \\
+\end{bmatrix}
+ & = & I \nonumber     .
+\end{IEEEeqnarray}
+
+We use a subset of $3N-2$ of the available equations,
+%
+\begin{IEEEeqnarray}{rCl}
+ \gamma \sigma_{1}   + \beta \sigma_{1,2} & = & I \nonumber \\
+ \gamma \sigma_{1,2} + \beta \sigma_{2}   & = & 0 \nonumber \\
+ %\gamma \sigma_{1,3} + \beta \sigma_{2,3} & = & 0 \nonumber \\
+ & & \nonumber \\
+ \beta^T \sigma_{1}   + \alpha \sigma_{1,2} + \beta \sigma_{1,3} & = & 0\nonumber \\
+ \beta^T \sigma_{1,2} + \alpha \sigma_{2}   + \beta \sigma_{2,3} & = & I\nonumber \\
+ \beta^T \sigma_{1,3} + \alpha \sigma_{2,3} + \beta \sigma_{3}   & = & 0\nonumber \\
+ & & \nonumber \\
+ \beta^T \sigma_{2}   + \alpha \sigma_{2,3} + \beta \sigma_{2,4} & = & 0\nonumber \\
+ \beta^T \sigma_{2,3} + \alpha \sigma_{3}   + \beta \sigma_{3,4} & = & I\nonumber \\
+ \beta^T \sigma_{2,4} + \alpha \sigma_{3,4} + \beta \sigma_{4}   & = & 0\nonumber \\
+ & \vdots & \nonumber \\
+ \beta^T \sigma_{N-2}     + \alpha \sigma_{N-2,N-1} + \beta \sigma_{N-2,N} & = & 0\nonumber \\
+ \beta^T \sigma_{N-2,N-1} + \alpha \sigma_{N-1}     + \beta \sigma_{N-1,N} & = & I\nonumber \\
+ \beta^T \sigma_{N-2,N}   + \alpha \sigma_{N-1,N}   + \beta \sigma_{N}   & = & 0\nonumber \\
+ & & \nonumber \\
+ \beta^T \sigma_{N-1}   + \delta \sigma_{N-1,N} & = & 0\nonumber \\
+ \beta^T \sigma_{N-1,N} + \delta \sigma_{N}     & = & I\nonumber      .
+\end{IEEEeqnarray}
+
+In the same manner as the $\mu$s, we can cascade through these numerically to get two equations in two unknowns ($\sigma_1$ and $\sigma_N$). In the above, the $n$th block corresponds to the $n$th row of $\Sigma^{-1}$, and allows us to calculate $\sigma_{n-1,n+1}$, $\sigma_{n,n+1}$ and $\sigma_{n+1}$ (excepting the first and last blocks). The last block gives us a second constraint for $\sigma_N$. A similar back substitution phase then follows.
+
+This procedure is $\mathcal{O}(N)$ (or rather $\mathcal{O}(3N)$ to be precise) but it may be parallelised in the same way as the mean calculation. To start at the $(K+1)$th step, we need to assume $\sigma_{K}$, $\sigma_{K+1}$ and $\sigma_{K,K+1}$ are known.
+
+
+
+\section{Fourier Transform Method}
+
+Rich has details of this. Its efficacy depends on whether the parallel FFT is $\mathcal{O}(N)$ or $\mathcal{O}(\log_2(N))$, which we need to investigate.
+
+
+
+\end{document} 
